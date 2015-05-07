@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:orientation="vertical" >
+
+    <FrameLayout
+        android:id="@+id/camera_preview"
+        android:layout_width="fill_parent"
+        android:layout_height="199dp" >
+
+    </FrameLayout>
+
+    <ImageView
+        android:id="@+id/imageView1"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitXY" />
+
+    <Button
+        android:id="@+id/button_capture"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:onClick="snapIt"
+        android:text="@string/Capture"
+        android:layout_gravity="center_horizontal|bottom" />
+</LinearLayout-->
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:orientation="vertical">
+
+    <FrameLayout
+        android:id="@+id/camera_preview"
+        android:layout_width="fill_parent"
+        android:layout_height="fill_parent"
+        android:layout_alignParentBottom="true"
+        android:onClick="gameShoot" >
+
+        <!--ImageView
+            android:layout_width="fill_parent"
+            android:layout_height="fill_parent"
+            android:id="@+id/imageView1"
+            android:layout_gravity="center"
+            android:onClick="snapIt" /-->
+
+        <!--Button
+            android:id="@+id/button_capture"
+            android:onClick="snapIt"
+            android:text="@string/Capture"
+            android:layout_gravity="left|bottom"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="12dp"
+            android:layout_marginBottom="12dp" /-->
+
+    </FrameLayout>
+
+    <ToggleButton
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:id="@+id/toggleBtnMenu"
+        android:layout_gravity="right|top"
+        android:layout_marginRight="12dp"
+        android:layout_marginTop="12dp"
+        android:textOff="Pause"
+        android:textOn="Play"
+        android:onClick="gamePause"
+        android:layout_alignParentRight="true"
+        android:layout_alignParentTop="true" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:id="@+id/game_points"
+        android:layout_gravity="left|top"
+        android:layout_alignParentTop="true"
+        android:layout_toRightOf="@+id/game_points_text"
+        android:layout_toEndOf="@+id/game_points_text"
+        android:layout_marginLeft="5dp"
+        android:layout_marginTop="12dp"
+        android:textColor="#000000"
+        android:background="#ffbfbfbf"
+        android:text="0" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:textAppearance="?android:attr/textAppearanceMedium"
+        android:text="Points:"
+        android:id="@+id/game_points_text"
+        android:layout_gravity="left|top"
+        android:layout_marginLeft="12dp"
+        android:layout_marginTop="12dp"
+        android:textColor="#000000"
+        android:background="#ffbfbfbf" />
+
+</RelativeLayout>
