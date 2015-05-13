@@ -36,12 +36,12 @@
         android:layout_marginStart="47dp" />
 
     <ImageView
-        android:layout_width="200dp"
-        android:layout_height="140dp"
+        android:layout_width="50dp"
+        android:layout_height="50dp"
         android:id="@+id/sight"
         android:layout_centerVertical="true"
         android:layout_centerHorizontal="true"
-        android:background="@drawable/sight" />
+        android:background="@drawable/crosshairs" />
 
     <!--Button
         android:layout_width="wrap_content"

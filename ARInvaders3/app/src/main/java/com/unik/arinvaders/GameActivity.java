@@ -27,7 +27,7 @@ public class GameActivity extends Activity implements CvCameraViewListener2, OnT
     private GameEngine gameEngine;
     private GameFrameRender frameRender;
 
-    private MediaPlayer mp;
+    private MediaPlayer mpLaser, mpExplosion;
 
     private BaseLoaderCallback mLoaderCallback = new BaseLoaderCallback(this) {
         @Override
@@ -63,11 +63,12 @@ public class GameActivity extends Activity implements CvCameraViewListener2, OnT
         cameraView.setVisibility(SurfaceView.VISIBLE);
         cameraView.setCvCameraViewListener(this);
 
-        //mediaplayer
-        mp = MediaPlayer.create(this, R.raw.laser);
+        //media player
+        mpLaser = MediaPlayer.create(this, R.raw.laser);
+        mpExplosion = MediaPlayer.create(this, R.raw.explosion);
 
         //game engine
-        gameEngine = new GameEngine(mp);
+        gameEngine = new GameEngine();
     }
 
     public void togglePause(View v){
@@ -77,12 +78,6 @@ public class GameActivity extends Activity implements CvCameraViewListener2, OnT
             onResume();
         }
     }
-
-    /*
-    public void captureGameSpace(View v){
-        gameEngine.setGameFrameCaptured(true);
-        cameraView.getMatrix();
-    }*/
 
     @Override
     public void onPause()
@@ -131,7 +126,7 @@ public class GameActivity extends Activity implements CvCameraViewListener2, OnT
             gameEngine.setGameFrameCaptured(true);
         }else{ // if (cameraView != null){
         //if (gameEngine.getGameFrameCaptured()){
-            gameEngine.shoot();
+            gameEngine.shoot(mpLaser, mpExplosion);
         }
 
         return false;
@@ -169,7 +164,7 @@ public class CameraActivity extends Activity { //ActionBarActivity {
     private Camera cameraObject;
     private ShowCamera showCamera;
     private ImageView pic;
-    private MediaPlayer mp;
+    private MediaPlayer mpLaser;
     private int points = 0;
 
     static{ System.loadLibrary("opencv_java"); }
@@ -205,7 +200,7 @@ public class CameraActivity extends Activity { //ActionBarActivity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_start);
-        mp = MediaPlayer.create(this, R.raw.laser);
+        mpLaser = MediaPlayer.create(this, R.raw.laser);
         //pic = (ImageView)findViewById(R.id.imageView1);
         cameraObject = isCameraAvailiable();
         showCamera = new ShowCamera(this, cameraObject);
@@ -254,11 +249,11 @@ public class CameraActivity extends Activity { //ActionBarActivity {
         //temp
         incPoints();
 
-        if (mp.isPlaying()) {
-            mp.stop();
-            mp.prepare();
+        if (mpLaser.isPlaying()) {
+            mpLaser.stop();
+            mpLaser.prepare();
         }
-        mp.start();
+        mpLaser.start();
     }
 
     public void gamePause(View v){

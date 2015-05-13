@@ -1,6 +1,6 @@
 /*
  * This file is auto-generated.  DO NOT MODIFY.
- * Original file: /home/maskinsyn-9/Documents/unik4690-ARInvaders/ARInvaders3/openCVLibrary2410/src/main/aidl/org/opencv/engine/OpenCVEngineInterface.aidl
+ * Original file: /home/joakimmyrvoll/Dropbox/skole/8_V15/unik4690/Project/ARInvaders3/openCVLibrary2410/src/main/aidl/org/opencv/engine/OpenCVEngineInterface.aidl
  */
 package org.opencv.engine;
 /**
