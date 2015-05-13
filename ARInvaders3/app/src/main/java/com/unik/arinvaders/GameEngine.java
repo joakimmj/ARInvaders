@@ -176,7 +176,6 @@ public class GameEngine {
 
         /*
         if(tmpPoint != null) {//target != null) {
-
             for (Point point : tmpPoint) {
                 Core.circle(rgbaFrame, point, 4, RED, -1, 8, 0);
             }
