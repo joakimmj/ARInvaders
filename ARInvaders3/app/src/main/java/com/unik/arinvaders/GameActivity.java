@@ -115,7 +115,7 @@ public class GameActivity extends Activity implements CvCameraViewListener2, OnT
     }
 
     public Mat onCameraFrame(CvCameraViewFrame inputFrame) {
-        return frameRender.render(inputFrame, cameraView);
+        return frameRender.render(inputFrame);
     }
 
     public boolean onTouch(View v, MotionEvent event) {

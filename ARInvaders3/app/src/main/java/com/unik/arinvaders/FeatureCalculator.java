@@ -5,6 +5,7 @@ import org.opencv.core.Mat;
 import org.opencv.core.MatOfDMatch;
 import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.Size;
+import org.opencv.features2d.DMatch;
 import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.DescriptorMatcher;
 import org.opencv.features2d.FeatureDetector;
@@ -23,29 +24,34 @@ public class FeatureCalculator {
     private FeatureDetector detector;
     private DescriptorExtractor descriptor;
     private DescriptorMatcher matcher;
+    private int numbOfKeyPoints;
     //private MatOfKeyPoint keys;
     //private MatOfDMatch matches;
     //private Comparator<KeyPoint> keyPointComparator;
 
-    public FeatureCalculator(int detectorType, int descriptorType, int matcherType) {
+    public FeatureCalculator(int detectorType, int descriptorType, int matcherType, int numbOfKeyPoints) {
         detector = FeatureDetector.create(detectorType);
         descriptor = DescriptorExtractor.create(descriptorType);
         matcher = DescriptorMatcher.create(matcherType);
+        this.numbOfKeyPoints = numbOfKeyPoints;
 
         //keys = new MatOfKeyPoint();
         //matches = new MatOfDMatch();
 
     }
 
-    public void getFeatures(Mat frame, Mat desc, MatOfKeyPoint keys, int numbOfKeyPoints){
-        calculateFeatures(frame, desc, keys, numbOfKeyPoints);
+    public void getFeatures(Mat frame, Mat desc, MatOfKeyPoint keys){
+        calculateFeatures(frame, desc, keys);
     }
 
-    public void getMatches(Mat desc, Mat refDesc, MatOfDMatch matches){
-        calculateMatches(desc, refDesc, matches);
+    public void getMatches(Mat frame, Mat desc, MatOfKeyPoint keys, Mat preDesc, MatOfDMatch matches){
+        calculateFeatures(frame, desc, keys);
+        if(!preDesc.empty()) {
+            calculateMatches(desc, preDesc, matches);
+        }
     }
 
-    private void keyPointFilter(MatOfKeyPoint keys, int numb){
+    private void keyPointFilter(MatOfKeyPoint keys){
         //if(keys.empty()) return null;
 
         //higher response -> richer key point (maybe set threshold)
@@ -62,13 +68,13 @@ public class FeatureCalculator {
             }
         });
 
-        numb = (arrKeys.length < numb)? arrKeys.length : numb;
-        arrKeys = Arrays.copyOf(arrKeys, numb);
+        int tmpNumb = (arrKeys.length < numbOfKeyPoints)? arrKeys.length : numbOfKeyPoints;
+        arrKeys = Arrays.copyOf(arrKeys, tmpNumb);
 
         keys.fromArray(arrKeys);
     }
 
-    private void calculateFeatures(Mat frame, Mat desc, MatOfKeyPoint keys, int numbOfKeyPoints){
+    private void calculateFeatures(Mat frame, Mat desc, MatOfKeyPoint keys){
         //scale frame
         double scale = 0.5;
         Mat newFrame = new Mat();
@@ -77,7 +83,7 @@ public class FeatureCalculator {
         detector.detect(newFrame, keys);
 
         //remove weak key points
-        keyPointFilter(keys, numbOfKeyPoints);
+        keyPointFilter(keys);
 
         descriptor.compute(newFrame, keys, desc);
     }
@@ -87,5 +93,19 @@ public class FeatureCalculator {
         matcher.match(desc, preDesc, matches);
 
         //remove weak matches
+        double minDist=Float.MAX_VALUE; //,maxDist=0;
+
+        for(DMatch dm : matches.toArray()){
+            if(dm.distance < minDist) minDist = dm.distance;
+            //else if(dm.distance > maxDist) maxDist = dm.distance;
+        }
+
+        DMatch[] dm = matches.toArray();
+        int k = 0;
+        for(int i = 0; i < dm.length;i++) {
+            if (dm[i].distance < 3 * minDist) dm[k++] = dm[i];//let live
+        }
+        dm = Arrays.copyOf(dm, k);
+        matches.fromArray(dm);
     }
 }

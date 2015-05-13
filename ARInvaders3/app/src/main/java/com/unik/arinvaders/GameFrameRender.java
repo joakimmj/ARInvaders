@@ -8,7 +8,7 @@ abstract class FrameRender {
     //protected TmpCameraCalibrator mCalibrator;
     protected GameEngine gameEngine;
 
-    public abstract Mat render(CvCameraViewFrame inputFrame, CameraBridgeViewBase cameraView);
+    public abstract Mat render(CvCameraViewFrame inputFrame);
 }
 
 class GameEngineFrameRender extends FrameRender {
@@ -17,10 +17,10 @@ class GameEngineFrameRender extends FrameRender {
     }
 
     @Override
-    public Mat render(CvCameraViewFrame inputFrame, CameraBridgeViewBase cameraView) {
+    public Mat render(CvCameraViewFrame inputFrame) {
         Mat rgbaFrame = inputFrame.rgba();
         Mat grayFrame = inputFrame.gray();
-        gameEngine.processFrame(grayFrame, rgbaFrame, cameraView);
+        gameEngine.processFrame(grayFrame, rgbaFrame);
 
         return rgbaFrame;
     }
@@ -63,7 +63,7 @@ class GameFrameRender {
     public GameFrameRender(FrameRender frameRender) {
         mFrameRender = frameRender;
     }
-    public Mat render(CvCameraViewFrame inputFrame, CameraBridgeViewBase cameraView) {
-        return mFrameRender.render(inputFrame, cameraView);
+    public Mat render(CvCameraViewFrame inputFrame) {
+        return mFrameRender.render(inputFrame);
     }
 }

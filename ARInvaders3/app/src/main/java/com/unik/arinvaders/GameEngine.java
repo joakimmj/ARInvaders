@@ -15,6 +15,7 @@ import org.opencv.core.Point;
 import org.opencv.core.Scalar;
 import org.opencv.core.Size;
 import org.opencv.core.TermCriteria;
+import org.opencv.features2d.DMatch;
 import org.opencv.features2d.FeatureDetector;
 import org.opencv.features2d.DescriptorExtractor;
 import org.opencv.features2d.DescriptorMatcher;
@@ -33,8 +34,9 @@ public class GameEngine {
     private FeatureDetector detector;
     private DescriptorExtractor descriptor;
     private DescriptorMatcher matcher;
-    private Mat[] refImg, refDesc, desc;
-    private MatOfKeyPoint[] keys, refKeys;
+    private Mat[] refImg, refDesc, desc = {new Mat(), new Mat()};
+    private Mat preFrame;
+    private MatOfKeyPoint[] keys = {new MatOfKeyPoint(), new MatOfKeyPoint()}, refKeys;
     private MatOfDMatch matches;
     //private MediaPlayer mpLaser;
     private boolean gameFrameCaptured = false;
@@ -69,7 +71,7 @@ public class GameEngine {
 
     public GameEngine(){
         //this.mpLaser = mpLaser;
-        fc = new FeatureCalculator(FeatureDetector.ORB, DescriptorExtractor.ORB, DescriptorMatcher.BRUTEFORCE_HAMMING);
+        fc = new FeatureCalculator(FeatureDetector.ORB, DescriptorExtractor.ORB, DescriptorMatcher.BRUTEFORCE_HAMMING, 100);
 
         detector = FeatureDetector.create(FeatureDetector.ORB);
         descriptor = DescriptorExtractor.create(DescriptorExtractor.ORB);
@@ -89,6 +91,7 @@ public class GameEngine {
         targetIdx = 0;
         tmpX = false;
         tmpY = false;
+        preFrame = new Mat();
 
         //LK
         termcrit = new TermCriteria(TermCriteria.COUNT|TermCriteria.EPS,20,0.03);
@@ -108,25 +111,43 @@ public class GameEngine {
         //Video.calcOpticalFlowPyrLK();
     }
 
-    public void processFrame(Mat grayFrame, Mat rgbaFrame, CameraBridgeViewBase cameraView) {
+    public void processFrame(Mat grayFrame, Mat rgbaFrame) {
 
+        /*
         if(!gameFrameCaptured){
-            fc.getFeatures(grayFrame, desc[1], keys[1], 50);
-        }else if (!points[0].empty()) {
-            fc.getFeatures(grayFrame, desc[1], keys[1], 50);
-            fc.getMatches(desc[0],desc[1], matches);
+            fc.getFeatures(grayFrame, desc[1], keys[1]);
+
+        }else if (!desc[0].empty()) {*/
+        fc.getMatches(grayFrame, desc[1], keys[1], desc[0], matches);
+
+        /*
+        if(!matches.empty()) {
+            DMatch[] matchesArr = matches.toArray();
+            int seed = (matchesArr.length >= 10) ? 10 : matchesArr.length;
+            if (seed > 0) {
+                targetIdx = randPoint.nextInt(seed);
+                Point tmpPt = new Point(keys[1].toArray()[matchesArr[targetIdx].imgIdx].pt.x*2, keys[1].toArray()[matchesArr[targetIdx].imgIdx].pt.y*2);
+                drawTarget(rgbaFrame, tmpPt);
+            }
+        }*/
+        //}
+
+
+        for(KeyPoint key : keys[1].toArray()){
+            Point tmpPt = new Point(key.pt.x*2, key.pt.y*2);
+            Core.circle(rgbaFrame, tmpPt, 4, RED, -1, 8, 0);
         }
 
-        if(gameFrameCaptured) {
-            //swap(points[1], points[0]);
-            MatOfKeyPoint tmpKeys = keys[0];
-            keys[0] = keys[1];
-            keys[1] = tmpKeys;
+        //if(gameFrameCaptured) {
+        //swap(points[1], points[0]);
+        MatOfKeyPoint tmpKeys = keys[0];
+        keys[0] = keys[1];
+        keys[1] = tmpKeys;
 
-            Mat tmpDesc = desc[0];
-            desc[0] = desc[1];
-            desc[1] = tmpDesc;
-        }
+        Mat tmpDesc = desc[0];
+        desc[0] = desc[1];
+        desc[1] = tmpDesc;
+        //}
 
 
         /*
@@ -139,16 +160,35 @@ public class GameEngine {
         keys.fromArray(tmpKeys);
 
         Features2d.drawKeypoints(grayFrame, keys, rgbaFrame, RED, Features2d.DRAW_RICH_KEYPOINTS);
-
-        if(!keys.empty()){
-            numbFeatures = keys.toArray()[0].response;
-            //numbInits = keys.toArray()[keys.toArray().length-1].response;
-            numbInits = keys.toArray().length;
-        }
 */
+        if(!keys[1].empty()){
+            //numbFeatures = keys[1].toArray()[0].response;
+            //numbInits = keys.toArray()[keys.toArray().length-1].response;
+            numbInits = keys[1].toArray().length;
+
+            if(!matches.empty()){
+                numbFeatures = matches.toArray().length;
+            }
+            /*if(!keys[0].empty()) {
+                //fjern etterhvert
+                Mat tmp = new Mat();
+                Features2d.drawMatches(grayFrame, keys[0], preFrame, keys[1], matches, tmp, GREEN, RED, new MatOfByte(), Features2d.NOT_DRAW_SINGLE_POINTS);
+                Imgproc.resize(tmp, tmp, rgbaFrame.size());
+                Imgproc.cvtColor(tmp, rgbaFrame, Imgproc.COLOR_RGB2RGBA, 4);
+            }*/
+        }
+
+        preFrame = grayFrame.clone();
+
         //processLK(grayFrame, rgbaFrame);
         updateLevel();
         renderFrame(rgbaFrame);
+    }
+
+    private void drawTarget(Mat frame, Point center){
+        Core.circle(frame, center, 4, RED, -1, 8, 0);
+        Core.circle(frame, center, 16, RED, 4, 8, 0);
+        Core.circle(frame, center, 31, RED, 4, 8, 0);
     }
 
     private void updateLevel(){
