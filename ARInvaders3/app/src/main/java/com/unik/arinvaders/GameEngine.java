@@ -2,6 +2,7 @@ package com.unik.arinvaders;
 
 import android.media.MediaPlayer;
 
+import org.opencv.calib3d.Calib3d;
 import org.opencv.core.Core;
 import org.opencv.core.MatOfByte;
 import org.opencv.core.MatOfDMatch;
@@ -63,6 +64,8 @@ public class GameEngine {
     private Point target;
     private int targetDelay;
     private double  preDist, curDist;
+    private Mat H;
+    private int closestIdx;
 
     //tmp
     private float numbFeatures;
@@ -93,6 +96,8 @@ public class GameEngine {
         preDist = 1;
         curDist = 1;
         dd = 1;
+        H = new Mat();
+        closestIdx = 0;
 
         //LK
         criteria = new TermCriteria(TermCriteria.COUNT|TermCriteria.EPS,20,0.03);
@@ -119,7 +124,29 @@ public class GameEngine {
     }
 
     private double calcDist(Point a, Point b){
+        /*
+        double deltaXY = Math.abs(Math.sqrt(Math.pow(a.x-b.x, 2) + Math.pow(a.y-b.y)));
+        double deltaYZ = Math.abs(Math.sqrt(Math.pow(b.x-c.x, 2) + Math.pow(b.y-c.y)));
+        double deltaZX = Math.abs(Math.sqrt(Math.pow(c.x-a.x, 2) + Math.pow(c.y-a.y)));
+        return (deltaXY+deltaYZ+deltaZY)/3;
+         */
         return Math.abs(Math.sqrt(Math.pow(a.x-b.x,2) + Math.pow(a.y-b.y,2)));
+    }
+
+    private void calcHomography(MatOfPoint2f src, MatOfPoint2f dest) {
+        //funker best paa flater....
+        Point[] tmpSrc = src.toArray(), tmpDest = dest.toArray();
+        if(tmpSrc.length > tmpDest.length){
+            tmpSrc = Arrays.copyOf(tmpSrc, tmpDest.length);
+        }else if(tmpSrc.length < tmpDest.length){
+            tmpDest = Arrays.copyOf(tmpDest, tmpSrc.length);
+        }
+        H = Calib3d.findHomography(new MatOfPoint2f(tmpDest), new MatOfPoint2f(tmpSrc));
+//        int npoints = src.toArray().length;
+//        if(npoints >= 0 && dest.checkVector(2) == npoints && src.type() == dest.type()) {//dest.checkVector(2) )
+//            //H = Calib3d.findHomography(source, dest, Calib3d.RANSAC, 3);
+//            H = Calib3d.findHomography(src, dest);
+//        }
     }
 
     private List<Point> findCenteredPoints (Point[] allPoints, double maxDist, Point center) {
@@ -145,6 +172,7 @@ public class GameEngine {
             //if(targetIdx >= 0 && targetIdx < tmpPoint.length) {
             //    target = tmpPoint[targetIdx];
             //}
+            //if(!points[1].empty()) calcHomography(points[0], points[1]);
         }
 
         MatOfPoint2f tmp = points[0];
@@ -162,13 +190,15 @@ public class GameEngine {
             if(targetIdx < tmpPoint.length) {
                 Point target = tmpPoint[targetIdx];
                 Point center = new Point(rgbaFrame.cols()/2,rgbaFrame.rows()/2);
-                if(tmpPoint.length > 1) curDist = calcDist(tmpPoint[0], tmpPoint[1]);
-                dd = curDist/preDist;
-                if(dd > 1.01){
-                    deltaDist += dd;
-                }else if(dd < 0.99){
-                    deltaDist -= dd;
-                }
+
+                closestIdx = distClosest(target, points[0]);
+//                if(tmpPoint.length > 1) curDist = calcDist(tmpPoint[0], tmpPoint[1]);
+//                dd = curDist/preDist;
+//                if(dd > 1.01){
+//                    deltaDist += dd;
+//                }else if(dd < 0.99){
+//                    deltaDist -= dd;
+//                }
                 //deltaDist = dd;// + ((int) (curDist-preDist))/10;
                 //preDist = curDist;
                 drawTarget(rgbaFrame, target, deltaDist);
@@ -263,10 +293,24 @@ public class GameEngine {
         preDist = curDist;
     }
 
+    private int distClosest(Point pt, MatOfPoint2f points){
+        int idx = 0;
+        double dist = Float.MAX_VALUE;
+
+        for(int i = 0; i<points.toArray().length; i++){
+            double tmpDist = calcDist(points.toArray()[i], pt);
+            if(tmpDist < dist) {
+                dist = tmpDist;
+                idx = i;
+            }
+        }
+        return idx;
+    }
+
     private void drawTarget(Mat frame, Point center, double deltaDist){
         if((int)(deltaDist*4) == 0) deltaDist = 0.25;
-        Core.circle(frame, center, (int)(deltaDist*32), WHITE, -1, 8, 0);
-        Core.circle(frame, center, (int)(deltaDist*4), RED, -1, 8, 0);
+        Core.circle(frame, center, (int) (deltaDist * 32), WHITE, -1, 8, 0);
+        Core.circle(frame, center, (int) (deltaDist * 4), RED, -1, 8, 0);
         Core.circle(frame, center, (int)(deltaDist*16), RED, 8, 8, 0);
         Core.circle(frame, center, (int)(deltaDist*32), RED, 8, 8, 0);
     }
@@ -307,8 +351,11 @@ public class GameEngine {
                 if(targetIdx > i){
                     targetIdx--;
                 }
-                if(i == 0 || i == 1){
-                    recalcDist = true;
+//                if(i == 0 || i == 1){
+//                    recalcDist = true;
+//                }
+                if(closestIdx > i){
+                    closestIdx--;
                 }
                 continue;
             }
@@ -318,6 +365,8 @@ public class GameEngine {
         if(recalcDist) preDist = calcDist(tmpPoint[0], tmpPoint[1]);
         tmpPoint = Arrays.copyOf(tmpPoint, k);
         keys.fromArray(tmpPoint);
+
+        //calcHomography(preKeys, keys);
     }
 
     private void updateLevel(){
@@ -419,8 +468,25 @@ public class GameEngine {
         Core.putText(rgbaFrame, "Level: " + level + " Points: " + score, new Point(30, 30),
                 Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);
 
-        Core.putText(rgbaFrame, " Reload: " + numbInit + " Features: " + numbFeatures + " curDist: " + curDist + " preDist: " + preDist + " deltaDist: " + dd, new Point(30, rgbaFrame.rows() - 30),
-                Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);
+
+        double[] tmpx = null, tmpy = null;
+        if(!H.empty()) {
+            tmpx = H.get(0, 2);
+            tmpy = H.get(1, 2);
+        }
+        double hx=0, hy=0;
+        if(tmpx != null && tmpy != null){
+            hx = tmpx[0];
+            hy = tmpy[0];
+        }
+
+        Core.putText(rgbaFrame, "Reload: " + numbInit + " Features: " + numbFeatures + " curDist: "
+                        + curDist + " preDist: " + preDist + " deltaDist: " + dd,
+                new Point(30, rgbaFrame.rows() - 90), Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);
+        Core.putText(rgbaFrame, "H.x " + hx + " H.y " + hy + " H: " + H.size(),
+                new Point(30, rgbaFrame.rows() - 60), Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);
+        Core.putText(rgbaFrame, "H " + H.toString(),
+                new Point(30, rgbaFrame.rows() - 30), Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);
     }
 
     public void setGameFrameCaptured(boolean gameFrameCaptured) {
