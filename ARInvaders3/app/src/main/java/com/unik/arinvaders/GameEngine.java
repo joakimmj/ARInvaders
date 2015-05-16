@@ -47,7 +47,7 @@ public class GameEngine {
     //private BackgroundCalculations calc;
     private boolean first;
     private Random randPoint;
-    private boolean tmpX, tmpY;
+    private boolean tmpX, tmpY, shot;
     private double deltaDist;
 
     //LK
@@ -65,7 +65,9 @@ public class GameEngine {
     private int targetDelay;
     private double  preDist, curDist;
     private Mat H;
-    private int closestIdx;
+    private int closestIdx, shots;
+    private ArrayList<Point> bullets;
+    private MediaPlayer mpExplosion;
 
     //tmp
     private float numbFeatures;
@@ -75,9 +77,9 @@ public class GameEngine {
     //TEST
     private FeatureCalculator fc;
 
-    public GameEngine(){
+    public GameEngine(MediaPlayer mpExplosion){
         fc = new FeatureCalculator(FeatureDetector.ORB, DescriptorExtractor.ORB, DescriptorMatcher.BRUTEFORCE_HAMMING, 100);
-
+        this.mpExplosion = mpExplosion;
         detector = FeatureDetector.create(FeatureDetector.ORB);
         descriptor = DescriptorExtractor.create(DescriptorExtractor.ORB);
         matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
@@ -92,12 +94,15 @@ public class GameEngine {
         tmpX = false;
         tmpY = false;
         preFrame = new Mat();
-        deltaDist = 1;
+        deltaDist = 36;
         preDist = 1;
         curDist = 1;
         dd = 1;
         H = new Mat();
         closestIdx = 0;
+        shot = false;
+        bullets = new ArrayList<>();
+        shots = 0;
 
         //LK
         criteria = new TermCriteria(TermCriteria.COUNT|TermCriteria.EPS,20,0.03);
@@ -161,6 +166,10 @@ public class GameEngine {
     }
 
     public void processFrame(Mat grayFrame, Mat rgbaFrame) {
+        while(shots > 0) {
+            bullets.add(new Point(rgbaFrame.cols() / 2, rgbaFrame.rows()));
+            shots--;
+        }
         //if(!gameFrameCaptured || points[1].toArray().length < 20){
         if(points[1].toArray().length < 20){
             calcFeatures(grayFrame, points[1]);
@@ -191,7 +200,13 @@ public class GameEngine {
                 Point target = tmpPoint[targetIdx];
                 Point center = new Point(rgbaFrame.cols()/2,rgbaFrame.rows()/2);
 
-                closestIdx = distClosest(target, points[0]);
+                int tmpIdx = distClosest(target, tmpPoint, 20);
+                closestIdx = (tmpIdx == -1)? closestIdx : tmpIdx;
+                deltaDist = calcDist(target, tmpPoint[closestIdx]);
+                tmpX = center.x - deltaDist < target.x && target.x < center.x + deltaDist;
+                tmpY = center.y - deltaDist < target.y && target.y < center.y + deltaDist;
+                drawTarget(rgbaFrame, target, tmpPoint);
+                //Core.circle(rgbaFrame, target, (int)deltaDist, RED, -1, 8, 0);
 //                if(tmpPoint.length > 1) curDist = calcDist(tmpPoint[0], tmpPoint[1]);
 //                dd = curDist/preDist;
 //                if(dd > 1.01){
@@ -201,9 +216,9 @@ public class GameEngine {
 //                }
                 //deltaDist = dd;// + ((int) (curDist-preDist))/10;
                 //preDist = curDist;
-                drawTarget(rgbaFrame, target, deltaDist);
-                tmpX = center.x - 10 < target.x && target.x < center.x + 10;
-                tmpY = center.y - 10 < target.y && target.y < center.y + 10;
+
+
+
             }else{
                 targetTimer-=targetDelay;
             }
@@ -291,15 +306,18 @@ public class GameEngine {
         updateLevel();
         renderFrame(rgbaFrame);
         preDist = curDist;
+        shot = false;
     }
 
-    private int distClosest(Point pt, MatOfPoint2f points){
+    private int distClosest(Point pt, Point[] points, int sub){
         int idx = 0;
         double dist = Float.MAX_VALUE;
 
-        for(int i = 0; i<points.toArray().length; i++){
-            double tmpDist = calcDist(points.toArray()[i], pt);
-            if(tmpDist < dist) {
+        sub = (sub > points.length)? points.length : sub;
+
+        for(int i = 0; i<sub; i++){
+            double tmpDist = calcDist(points[i], pt);
+            if(tmpDist < dist && points[i] != pt){
                 dist = tmpDist;
                 idx = i;
             }
@@ -307,12 +325,19 @@ public class GameEngine {
         return idx;
     }
 
-    private void drawTarget(Mat frame, Point center, double deltaDist){
-        if((int)(deltaDist*4) == 0) deltaDist = 0.25;
-        Core.circle(frame, center, (int) (deltaDist * 32), WHITE, -1, 8, 0);
-        Core.circle(frame, center, (int) (deltaDist * 4), RED, -1, 8, 0);
-        Core.circle(frame, center, (int)(deltaDist*16), RED, 8, 8, 0);
-        Core.circle(frame, center, (int)(deltaDist*32), RED, 8, 8, 0);
+    private void drawTarget(Mat frame, Point center, Point[] points){
+//        if(points[closestIdx] != null && target != null) {
+//            deltaDist = calcDist(target, points[closestIdx]);
+////            tmpX = center.x - deltaDist/2 < target.x && target.x < center.x + deltaDist/2;
+////            tmpY = center.y - deltaDist/2 < target.y && target.y < center.y + deltaDist/2;
+//        }
+        //if((int)(deltaDist*4) == 0) deltaDist = 0.25;
+        deltaDist = (deltaDist < frame.rows()*0.03)? frame.rows()*0.03 : deltaDist;
+        deltaDist = (deltaDist > frame.rows()*0.2)? frame.rows()*0.2 : deltaDist;
+        Core.circle(frame, center, (int) (deltaDist), WHITE, -1, 8, 0);
+        Core.circle(frame, center, (int) (deltaDist / 3), RED, -1, 8, 0);
+        Core.circle(frame, center, (int) (deltaDist * 2 / 3), RED, 8, 8, 0);
+        Core.circle(frame, center, (int) (deltaDist), RED, 8, 8, 0);
     }
 
     private void calcFeatures(Mat frame, MatOfPoint2f keys){
@@ -354,7 +379,9 @@ public class GameEngine {
 //                if(i == 0 || i == 1){
 //                    recalcDist = true;
 //                }
-                if(closestIdx > i){
+                if(closestIdx == i){
+                    recalcDist = true;
+                }else if(closestIdx > i){
                     closestIdx--;
                 }
                 continue;
@@ -362,7 +389,7 @@ public class GameEngine {
 
             tmpPoint[k++] = tmpPoint[i];
         }
-        if(recalcDist) preDist = calcDist(tmpPoint[0], tmpPoint[1]);
+        if(recalcDist && target != null) closestIdx = distClosest(target, tmpPoint, 20);//preDist = calcDist(tmpPoint[0], tmpPoint[1]);
         tmpPoint = Arrays.copyOf(tmpPoint, k);
         keys.fromArray(tmpPoint);
 
@@ -381,7 +408,8 @@ public class GameEngine {
             int seed = (keys.length > 10)? 10 : keys.length;
             targetIdx = randPoint.nextInt(seed);
             target = keys[targetIdx];
-            deltaDist = 1;
+            closestIdx = distClosest(target, keys, 20);
+            //deltaDist = 1;
         }
     }
 
@@ -399,13 +427,14 @@ public class GameEngine {
 
     public void shoot(MediaPlayer mpLaser, MediaPlayer mpExplosion){
         playSound(mpLaser);
+        shot = true;
+        shots++;
 
-
-        if(tmpX && tmpY){
-            playSound(mpExplosion);
-            score++;
-            //computeTarget(true);
-        }
+//        if(tmpX && tmpY){
+//            playSound(mpExplosion);
+//            score++;
+//            //computeTarget(true);
+//        }
     }
 
     /*
@@ -463,7 +492,29 @@ public class GameEngine {
         }
     }*/
 
+    private void drawBullets(ArrayList<Point> bullets, Point center, double targetSize, Mat img) {
+        ArrayList<Point> rmBullets = new ArrayList<>();
+
+        Core.putText(img, "Bullets: " + bullets.size(),
+                new Point(30, img.rows() - 120), Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);
+
+        for(Point p : bullets){
+            p.y -= 40;
+
+            if(p.y < center.y) {
+                if(tmpX && tmpY){
+                    playSound(mpExplosion);
+                    score++;
+                }
+                rmBullets.add(p);
+            }else Core.circle(img, p, 8 + (int) ((p.y - center.y) / 6), GREEN, -1, 8, 0);
+        }
+        bullets.removeAll(rmBullets);
+    }
+
     private void renderFrame(Mat rgbaFrame) {
+        drawBullets(bullets, new Point(rgbaFrame.cols() / 2, rgbaFrame.rows() / 2), deltaDist, rgbaFrame);//Core.line(rgbaFrame, new Point(rgbaFrame.cols()/2, rgbaFrame.rows()), new Point(rgbaFrame.cols()/2, rgbaFrame.rows()/2), RED, 8);
+
         Core.rectangle(rgbaFrame, new Point(0,0), new Point(400,50), WHITE, -1, 8, 0);
         Core.putText(rgbaFrame, "Level: " + level + " Points: " + score, new Point(30, 30),
                 Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);

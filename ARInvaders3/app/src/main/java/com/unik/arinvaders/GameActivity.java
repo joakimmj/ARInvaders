@@ -68,7 +68,7 @@ public class GameActivity extends Activity implements CvCameraViewListener2, OnT
         mpExplosion = MediaPlayer.create(this, R.raw.explosion);
 
         //game engine
-        gameEngine = new GameEngine();
+        gameEngine = new GameEngine(mpExplosion);
     }
 
     public void togglePause(View v){
