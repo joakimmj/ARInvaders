@@ -107,7 +107,6 @@ public class GameActivity extends Activity implements CvCameraViewListener2, OnT
 
     public void onCameraViewStarted(int width, int height) {
         frameRender = new GameFrameRender(new GameEngineFrameRender(gameEngine));
-        //frameRender = new GameFrameRender(new InitFrameRender(gameEngine));
     }
 
     public void onCameraViewStopped() {
@@ -119,15 +118,7 @@ public class GameActivity extends Activity implements CvCameraViewListener2, OnT
     }
 
     public boolean onTouch(View v, MotionEvent event) {
-
-        if (!gameEngine.getGameFrameCaptured()){
-            //frameRender = new GameFrameRender(new FeaturesFrameRender(gameEngine));
-            //frameRender = new GameFrameRender(new GameEngineFrameRender(gameEngine));
-            gameEngine.setGameFrameCaptured(true);
-        }else{ // if (cameraView != null){
-        //if (gameEngine.getGameFrameCaptured()){
-            gameEngine.shoot(mpLaser, mpExplosion);
-        }
+        gameEngine.shoot(mpLaser);
 
         return false;
     }

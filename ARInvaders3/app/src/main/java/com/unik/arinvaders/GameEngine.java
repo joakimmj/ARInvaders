@@ -2,12 +2,9 @@ package com.unik.arinvaders;
 
 import android.media.MediaPlayer;
 
-import org.opencv.calib3d.Calib3d;
 import org.opencv.core.Core;
 import org.opencv.core.MatOfByte;
-import org.opencv.core.MatOfDMatch;
 import org.opencv.core.MatOfFloat;
-import org.opencv.core.MatOfKeyPoint;
 import org.opencv.core.MatOfPoint;
 import org.opencv.core.MatOfPoint2f;
 import org.opencv.core.Point;
@@ -24,111 +21,42 @@ import org.opencv.video.Video;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
-import java.util.Random;
 
 public class GameEngine {
     private int score = 0, level = 1;
-    private FeatureDetector detector;
-    private DescriptorExtractor descriptor;
-    private DescriptorMatcher matcher;
-    private Mat[] refImg, refDesc, desc = {new Mat(), new Mat()};
-    private Mat preFrame;
-    private MatOfKeyPoint[] keys = {new MatOfKeyPoint(), new MatOfKeyPoint()}, refKeys;
-    private MatOfDMatch matches;
-    //private MediaPlayer mpLaser;
-    private boolean gameFrameCaptured = false;
     private Scalar RED = new Scalar(255,0,0);
     private Scalar GREEN = new Scalar(0,255,0);
     private Scalar BLUE = new Scalar(0,0,255);
     private Scalar BLACK = new Scalar(0,0,0);
     private Scalar WHITE = new Scalar(255,255,255);
-    private int matchNumb;
-    //private BackgroundCalculations calc;
-    private boolean first;
-    private Random randPoint;
-    private boolean tmpX, tmpY, shot;
-    private double deltaDist;
-
-    //LK
     private TermCriteria criteria;
-    //private Size winSize;
-    private MatOfByte status;
-    private MatOfFloat err;
-    private Point[] tmpPoint;
-    private int curPoint;
     private Mat preGray;
     private MatOfPoint2f[] points;
-    private Long targetTimer;
     private int targetIdx;
-    private Point target;
-    private int targetDelay;
-    private double  preDist, curDist;
-    private Mat H;
-    private int closestIdx, shots;
+    private int shots;
     private ArrayList<Point> bullets;
     private MediaPlayer mpExplosion;
 
-    //tmp
-    private float numbFeatures;
-    private float numbInit;
-    double dd;
+    private Target t;
 
     //TEST
     private FeatureCalculator fc;
 
     public GameEngine(MediaPlayer mpExplosion){
+        t = new Target(10000);
+
         fc = new FeatureCalculator(FeatureDetector.ORB, DescriptorExtractor.ORB, DescriptorMatcher.BRUTEFORCE_HAMMING, 100);
         this.mpExplosion = mpExplosion;
-        detector = FeatureDetector.create(FeatureDetector.ORB);
-        descriptor = DescriptorExtractor.create(DescriptorExtractor.ORB);
-        matcher = DescriptorMatcher.create(DescriptorMatcher.BRUTEFORCE_HAMMING);
-        matches = new MatOfDMatch();
-        matchNumb = 0;//0b00000001;
-        first = true;
         //calc = new BackgroundCalculations();
-        randPoint = new Random();
-        targetTimer = System.currentTimeMillis();
-        targetDelay = 10000;
         targetIdx = 0;
-        tmpX = false;
-        tmpY = false;
-        preFrame = new Mat();
-        deltaDist = 36;
-        preDist = 1;
-        curDist = 1;
-        dd = 1;
-        H = new Mat();
-        closestIdx = 0;
-        shot = false;
         bullets = new ArrayList<>();
         shots = 0;
-
-        //LK
         criteria = new TermCriteria(TermCriteria.COUNT|TermCriteria.EPS,20,0.03);
-
-
         preGray = new Mat();
-        curPoint = 1;
         points = new MatOfPoint2f[]{new MatOfPoint2f(), new MatOfPoint2f()};
-
-        //tmp
-        numbFeatures = 0;
-        numbInit = 0;
     }
 
-    private double calcPointDinstances(Point[] kCenteredPoints, Point center) {
-        double pointDistance = 0; // Opp i global
-
-        for( Point p : kCenteredPoints ) {
-            pointDistance += calcDist(center, p);
-        }
-
-        return pointDistance;
-
-    }
-
-    private double calcDist(Point a, Point b){
+    private static double calcDist(Point a, Point b){
         /*
         double deltaXY = Math.abs(Math.sqrt(Math.pow(a.x-b.x, 2) + Math.pow(a.y-b.y)));
         double deltaYZ = Math.abs(Math.sqrt(Math.pow(b.x-c.x, 2) + Math.pow(b.y-c.y)));
@@ -138,50 +66,19 @@ public class GameEngine {
         return Math.abs(Math.sqrt(Math.pow(a.x-b.x,2) + Math.pow(a.y-b.y,2)));
     }
 
-    private void calcHomography(MatOfPoint2f src, MatOfPoint2f dest) {
-        //funker best paa flater....
-        Point[] tmpSrc = src.toArray(), tmpDest = dest.toArray();
-        if(tmpSrc.length > tmpDest.length){
-            tmpSrc = Arrays.copyOf(tmpSrc, tmpDest.length);
-        }else if(tmpSrc.length < tmpDest.length){
-            tmpDest = Arrays.copyOf(tmpDest, tmpSrc.length);
-        }
-        H = Calib3d.findHomography(new MatOfPoint2f(tmpDest), new MatOfPoint2f(tmpSrc));
-//        int npoints = src.toArray().length;
-//        if(npoints >= 0 && dest.checkVector(2) == npoints && src.type() == dest.type()) {//dest.checkVector(2) )
-//            //H = Calib3d.findHomography(source, dest, Calib3d.RANSAC, 3);
-//            H = Calib3d.findHomography(src, dest);
-//        }
-    }
-
-    private List<Point> findCenteredPoints (Point[] allPoints, double maxDist, Point center) {
-        List<Point> centeredPoints = new ArrayList<>();
-
-        for(Point p : allPoints) {
-            if(calcDist(center, p) < maxDist)
-                centeredPoints.add(p);
-        }
-
-        return centeredPoints;
-    }
-
     public void processFrame(Mat grayFrame, Mat rgbaFrame) {
+        //make bullets
         while(shots > 0) {
             bullets.add(new Point(rgbaFrame.cols() / 2, rgbaFrame.rows()));
             shots--;
         }
-        //if(!gameFrameCaptured || points[1].toArray().length < 20){
+
+        //calculate features
         if(points[1].toArray().length < 20){
             calcFeatures(grayFrame, points[1]);
-            numbInit++;
-            //computeTarget(true);
+            t.resetTimer();
         }else if (!points[0].empty()) {
             calcFlow(grayFrame, preGray, points[1], points[0]);
-
-            //if(targetIdx >= 0 && targetIdx < tmpPoint.length) {
-            //    target = tmpPoint[targetIdx];
-            //}
-            //if(!points[1].empty()) calcHomography(points[0], points[1]);
         }
 
         MatOfPoint2f tmp = points[0];
@@ -189,155 +86,28 @@ public class GameEngine {
         points[1] = tmp;
         preGray = grayFrame.clone();
 
+        //if features captured
         if(!points[0].empty()) {
             Point[] tmpPoint = points[0].toArray();
-            numbFeatures = tmpPoint.length;
-            if (targetTimer + targetDelay < System.currentTimeMillis()) {
-                computeTarget(tmpPoint);
-                targetTimer = System.currentTimeMillis();
+
+            //compute new target
+            if (t != null && t.getTimer() < System.currentTimeMillis()) {
+                t.create(tmpPoint);
             }
-            if(targetIdx < tmpPoint.length) {
-                Point target = tmpPoint[targetIdx];
-                Point center = new Point(rgbaFrame.cols()/2,rgbaFrame.rows()/2);
 
-                int tmpIdx = distClosest(target, tmpPoint, 20);
-                closestIdx = (tmpIdx == -1)? closestIdx : tmpIdx;
-                deltaDist = calcDist(target, tmpPoint[closestIdx]);
-                tmpX = center.x - deltaDist < target.x && target.x < center.x + deltaDist;
-                tmpY = center.y - deltaDist < target.y && target.y < center.y + deltaDist;
-                drawTarget(rgbaFrame, target, tmpPoint);
-                //Core.circle(rgbaFrame, target, (int)deltaDist, RED, -1, 8, 0);
-//                if(tmpPoint.length > 1) curDist = calcDist(tmpPoint[0], tmpPoint[1]);
-//                dd = curDist/preDist;
-//                if(dd > 1.01){
-//                    deltaDist += dd;
-//                }else if(dd < 0.99){
-//                    deltaDist -= dd;
-//                }
-                //deltaDist = dd;// + ((int) (curDist-preDist))/10;
-                //preDist = curDist;
-
-
-
+            //draw target
+            if(t.getPoint() != null) {
+                t.draw(rgbaFrame, tmpPoint, 20);
+                drawBullets(bullets, t.getPoint(), t.getRadius(), rgbaFrame, GREEN, mpExplosion);
             }else{
-                targetTimer-=targetDelay;
-            }
-        }
-
-        /*
-        if(!gameFrameCaptured){
-            fc.getFeatures(grayFrame, desc[1], keys[1]);
-
-        }else if (!desc[0].empty()) {*//*
-        fc.getMatches(grayFrame, desc[1], keys[1], desc[0], matches);
-
-
-        if(!matches.empty() && !keys[1].empty()) {
-            DMatch[] matchesArr = matches.toArray();
-            KeyPoint[] tmpKey = keys[1].toArray();
-            numbInit = matchesArr.length;
-            numbFeatures = tmpKey.length;
-
-            int seed = (matchesArr.length >= 10) ? 10 : matchesArr.length;
-            if (seed > 0) {
-                if( targetTimer + targetDelay < System.currentTimeMillis()) {
-                    targetIdx = randPoint.nextInt(seed);
-                }
-                Point tmpPt = new Point(tmpKey[matchesArr[targetIdx].imgIdx].pt.x*2, tmpKey[matchesArr[targetIdx].imgIdx].pt.y*2);
-                drawTarget(rgbaFrame, tmpPt);
-                targetTimer = System.currentTimeMillis();
+                t.resetTimer();
             }
 
-            for(DMatch dm : matchesArr ){
-                Core.circle(rgbaFrame, new Point(tmpKey[dm.queryIdx].pt.x*2,tmpKey[dm.queryIdx].pt.y*2), 4, RED, -1, 8, 0);
-            }
+            Core.putText(rgbaFrame, "Features: " + tmpPoint.length, new Point(90, 90),
+                    Core.FONT_HERSHEY_SIMPLEX, 1.0, new Scalar(255,0,0), 2);
         }
-        //}
-
-        *//*
-        for(KeyPoint key : keys[1].toArray()){
-            Point tmpPt = new Point(key.pt.x*2, key.pt.y*2);
-            Core.circle(rgbaFrame, tmpPt, 4, RED, -1, 8, 0);
-        }*//*
-
-        //if(gameFrameCaptured) {
-        //swap(points[1], points[0]);
-        MatOfKeyPoint tmpKeys = keys[0];
-        keys[0] = keys[1];
-        keys[1] = tmpKeys;
-
-        Mat tmpDesc = desc[0];
-        desc[0] = desc[1];
-        desc[1] = tmpDesc;
-        //}
-
-
-        *//*
-        KeyPoint[] tmpKeys = keys.toArray();
-
-        for(KeyPoint key : tmpKeys){
-            key.pt.x = key.pt.x*2;
-            key.pt.y = key.pt.y*2;
-        }
-        keys.fromArray(tmpKeys);
-
-        Features2d.drawKeypoints(grayFrame, keys, rgbaFrame, RED, Features2d.DRAW_RICH_KEYPOINTS);
-*//*
-        //if(!keys[1].empty()){
-            //numbFeatures = keys[1].toArray()[0].response;
-            //numbInit = keys.toArray()[keys.toArray().length-1].response;
-            //numbFeatures = keys[1].toArray().length;
-
-            //if(!matches.empty()){
-            //    numbInit = matches.toArray().length;
-            //}
-            *//*if(!keys[0].empty()) {
-                //fjern etterhvert
-                Mat tmp = new Mat();
-                Features2d.drawMatches(grayFrame, keys[0], preFrame, keys[1], matches, tmp, GREEN, RED, new MatOfByte(), Features2d.NOT_DRAW_SINGLE_POINTS);
-                Imgproc.resize(tmp, tmp, rgbaFrame.size());
-                Imgproc.cvtColor(tmp, rgbaFrame, Imgproc.COLOR_RGB2RGBA, 4);
-            }*//*
-        //}
-
-        preFrame = grayFrame.clone();*/
-
-        //processLK(grayFrame, rgbaFrame);
         updateLevel();
-        renderFrame(rgbaFrame);
-        preDist = curDist;
-        shot = false;
-    }
-
-    private int distClosest(Point pt, Point[] points, int sub){
-        int idx = 0;
-        double dist = Float.MAX_VALUE;
-
-        sub = (sub > points.length)? points.length : sub;
-
-        for(int i = 0; i<sub; i++){
-            double tmpDist = calcDist(points[i], pt);
-            if(tmpDist < dist && points[i] != pt){
-                dist = tmpDist;
-                idx = i;
-            }
-        }
-        return idx;
-    }
-
-    private void drawTarget(Mat frame, Point center, Point[] points){
-//        if(points[closestIdx] != null && target != null) {
-//            deltaDist = calcDist(target, points[closestIdx]);
-////            tmpX = center.x - deltaDist/2 < target.x && target.x < center.x + deltaDist/2;
-////            tmpY = center.y - deltaDist/2 < target.y && target.y < center.y + deltaDist/2;
-//        }
-        //if((int)(deltaDist*4) == 0) deltaDist = 0.25;
-        deltaDist = (deltaDist < frame.rows()*0.03)? frame.rows()*0.03 : deltaDist;
-        deltaDist = (deltaDist > frame.rows()*0.2)? frame.rows()*0.2 : deltaDist;
-        Core.circle(frame, center, (int) (deltaDist), WHITE, -1, 8, 0);
-        Core.circle(frame, center, (int) (deltaDist / 3), RED, -1, 8, 0);
-        Core.circle(frame, center, (int) (deltaDist * 2 / 3), RED, 8, 8, 0);
-        Core.circle(frame, center, (int) (deltaDist), RED, 8, 8, 0);
+        renderFrame(rgbaFrame, level, score);
     }
 
     private void calcFeatures(Mat frame, MatOfPoint2f keys){
@@ -369,51 +139,28 @@ public class GameEngine {
 
         Point[] tmpPoint = keys.toArray();
         int k = 0;
-        boolean recalcDist = false;
         for(int i = 0; i < tmpPoint.length; i++ ){
 
             if( 0 == status.toArray()[i] ) {
-                if(targetIdx > i){
-                    targetIdx--;
-                }
-//                if(i == 0 || i == 1){
-//                    recalcDist = true;
-//                }
-                if(closestIdx == i){
-                    recalcDist = true;
-                }else if(closestIdx > i){
-                    closestIdx--;
+                if(t.getIdx() > i){
+                    t.update();
                 }
                 continue;
             }
-
             tmpPoint[k++] = tmpPoint[i];
         }
-        if(recalcDist && target != null) closestIdx = distClosest(target, tmpPoint, 20);//preDist = calcDist(tmpPoint[0], tmpPoint[1]);
         tmpPoint = Arrays.copyOf(tmpPoint, k);
         keys.fromArray(tmpPoint);
-
-        //calcHomography(preKeys, keys);
     }
 
     private void updateLevel(){
-        if(score >= level*10){
+        if(score >= level*30){
             level++;
-            targetDelay -= 500;
+            t.decrTimer(500);
         }
     }
 
-    private void computeTarget(Point[] keys){
-        if(keys != null && keys.length > 0){
-            int seed = (keys.length > 10)? 10 : keys.length;
-            targetIdx = randPoint.nextInt(seed);
-            target = keys[targetIdx];
-            closestIdx = distClosest(target, keys, 20);
-            //deltaDist = 1;
-        }
-    }
-
-    private void playSound(MediaPlayer mp){
+    private static void playSound(MediaPlayer mp){
         if (mp.isPlaying()) {
             mp.stop();
             try {
@@ -425,16 +172,9 @@ public class GameEngine {
         mp.start();
     }
 
-    public void shoot(MediaPlayer mpLaser, MediaPlayer mpExplosion){
+    public void shoot(MediaPlayer mpLaser){
         playSound(mpLaser);
-        shot = true;
         shots++;
-
-//        if(tmpX && tmpY){
-//            playSound(mpExplosion);
-//            score++;
-//            //computeTarget(true);
-//        }
     }
 
     /*
@@ -492,60 +232,46 @@ public class GameEngine {
         }
     }*/
 
-    private void drawBullets(ArrayList<Point> bullets, Point center, double targetSize, Mat img) {
-        ArrayList<Point> rmBullets = new ArrayList<>();
+    private static boolean hitTarget(Point pt, Point target, double dist){
+        if (target == null) return false;
 
-        Core.putText(img, "Bullets: " + bullets.size(),
-                new Point(30, img.rows() - 120), Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);
+        boolean x = pt.x - dist < target.x && target.x < pt.x + dist;
+        boolean y = pt.y - dist < target.y && target.y < pt.y + dist;
+        return x && y;
+    }
+
+    private void drawHit(Mat frame, Point pt, MediaPlayer mp, double size, Scalar color, int inc){
+        playSound(mp);
+        Core.circle(frame, pt, (int) size, color, -1, 8, 0);
+        t.resetTimer();
+        score+=inc;
+    }
+
+    private void drawBullets(ArrayList<Point> bullets, Point target, double targetRad, Mat frame, Scalar color, MediaPlayer mp) {
+        ArrayList<Point> rmBullets = new ArrayList<>();
+        Point center = new Point(frame.cols() / 2, frame.rows() / 2);
 
         for(Point p : bullets){
             p.y -= 40;
 
-            if(p.y < center.y) {
-                if(tmpX && tmpY){
-                    playSound(mpExplosion);
-                    score++;
+            if (p.y < center.y){
+                if(hitTarget(center, target, targetRad/3)) {
+                    drawHit(frame, target, mp, targetRad/3, color, 5);
+                }else if(hitTarget(center, target, targetRad * 2 / 3)) {
+                    drawHit(frame, target, mp, targetRad*2/3, color, 3);
+                }else if(hitTarget(center, target, targetRad)) {
+                    drawHit(frame, target, mp, targetRad, color, 1);
                 }
                 rmBullets.add(p);
-            }else Core.circle(img, p, 8 + (int) ((p.y - center.y) / 6), GREEN, -1, 8, 0);
+            }else Core.circle(frame, p, 8 + (int) ((p.y - center.y) / 6), color, -1, 8, 0);
         }
         bullets.removeAll(rmBullets);
     }
 
-    private void renderFrame(Mat rgbaFrame) {
-        drawBullets(bullets, new Point(rgbaFrame.cols() / 2, rgbaFrame.rows() / 2), deltaDist, rgbaFrame);//Core.line(rgbaFrame, new Point(rgbaFrame.cols()/2, rgbaFrame.rows()), new Point(rgbaFrame.cols()/2, rgbaFrame.rows()/2), RED, 8);
-
-        Core.rectangle(rgbaFrame, new Point(0,0), new Point(400,50), WHITE, -1, 8, 0);
+    private static void renderFrame(Mat rgbaFrame, int level, int score) {
+        Core.rectangle(rgbaFrame, new Point(0, 0), new Point(400, 50), new Scalar(255, 255, 255), -1, 8, 0);
         Core.putText(rgbaFrame, "Level: " + level + " Points: " + score, new Point(30, 30),
-                Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);
-
-
-        double[] tmpx = null, tmpy = null;
-        if(!H.empty()) {
-            tmpx = H.get(0, 2);
-            tmpy = H.get(1, 2);
-        }
-        double hx=0, hy=0;
-        if(tmpx != null && tmpy != null){
-            hx = tmpx[0];
-            hy = tmpy[0];
-        }
-
-        Core.putText(rgbaFrame, "Reload: " + numbInit + " Features: " + numbFeatures + " curDist: "
-                        + curDist + " preDist: " + preDist + " deltaDist: " + dd,
-                new Point(30, rgbaFrame.rows() - 90), Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);
-        Core.putText(rgbaFrame, "H.x " + hx + " H.y " + hy + " H: " + H.size(),
-                new Point(30, rgbaFrame.rows() - 60), Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);
-        Core.putText(rgbaFrame, "H " + H.toString(),
-                new Point(30, rgbaFrame.rows() - 30), Core.FONT_HERSHEY_SIMPLEX, 1.0, RED, 2);
-    }
-
-    public void setGameFrameCaptured(boolean gameFrameCaptured) {
-        this.gameFrameCaptured = gameFrameCaptured;
-    }
-
-    public boolean getGameFrameCaptured(){
-        return gameFrameCaptured;
+                Core.FONT_HERSHEY_SIMPLEX, 1.0, new Scalar(255, 0, 0), 2);
     }
 }
 
