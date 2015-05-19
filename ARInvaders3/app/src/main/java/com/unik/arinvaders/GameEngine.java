@@ -26,7 +26,7 @@ public class GameEngine {
     private int score = 0, level = 1;
     private Scalar RED = new Scalar(255,0,0);
     private Scalar GREEN = new Scalar(0,255,0);
-    private Scalar BLUE = new Scalar(0,0,255);
+    private Scalar BLUE = new Scalar(0,128,255);
     private Scalar BLACK = new Scalar(0,0,0);
     private Scalar WHITE = new Scalar(255,255,255);
     private TermCriteria criteria;
@@ -67,6 +67,8 @@ public class GameEngine {
     }
 
     public void processFrame(Mat grayFrame, Mat rgbaFrame) {
+        //Mat main = rgbaFrame.clone();
+
         //make bullets
         while(shots > 0) {
             bullets.add(new Point(rgbaFrame.cols() / 2, rgbaFrame.rows()));
@@ -98,7 +100,7 @@ public class GameEngine {
             //draw target
             if(t.getPoint() != null) {
                 t.draw(rgbaFrame, tmpPoint, 20);
-                drawBullets(bullets, t.getPoint(), t.getRadius(), rgbaFrame, GREEN, mpExplosion);
+                drawBullets(bullets, t.getPoint(), t.getRadius(), rgbaFrame, new Scalar(249,50,253), mpExplosion);
             }else{
                 t.resetTimer();
             }
@@ -108,6 +110,8 @@ public class GameEngine {
         }
         updateLevel();
         renderFrame(rgbaFrame, level, score);
+
+        //Core.addWeighted(rgbaFrame, 0.8, main, 0.2, 0.0, rgbaFrame);
     }
 
     private void calcFeatures(Mat frame, MatOfPoint2f keys){
@@ -242,7 +246,7 @@ public class GameEngine {
 
     private void drawHit(Mat frame, Point pt, MediaPlayer mp, double size, Scalar color, int inc){
         playSound(mp);
-        Core.circle(frame, pt, (int) size, color, -1, 8, 0);
+        Core.circle(frame, pt, (int) size, new Scalar(255, 255, 0), -1, 8, 0);
         t.resetTimer();
         score+=inc;
     }
@@ -256,14 +260,14 @@ public class GameEngine {
 
             if (p.y < center.y){
                 if(hitTarget(center, target, targetRad/3)) {
-                    drawHit(frame, target, mp, targetRad/3, color, 5);
+                    drawHit(frame, target, mp, targetRad+10, color, 5);
                 }else if(hitTarget(center, target, targetRad * 2 / 3)) {
-                    drawHit(frame, target, mp, targetRad*2/3, color, 3);
+                    drawHit(frame, target, mp, targetRad+10, color, 3);
                 }else if(hitTarget(center, target, targetRad)) {
-                    drawHit(frame, target, mp, targetRad, color, 1);
+                    drawHit(frame, target, mp, targetRad+10, color, 1);
                 }
                 rmBullets.add(p);
-            }else Core.circle(frame, p, 8 + (int) ((p.y - center.y) / 6), color, -1, 8, 0);
+            }else Core.circle(frame, p, 8 + (int) ((p.y - center.y) / 10), color, -1, 8, 0);
         }
         bullets.removeAll(rmBullets);
     }
